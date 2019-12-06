@@ -1,0 +1,32 @@
+Date [option].. [+format]​
+
+​OPTION​
+
+     -d, --date=string       //will display given string as date not actual date
+
+     ​-R, --rfc-email         //output date and time inRFc5322format.   
+                               Example: Mon, 14 Aug 2006 02:34:56 -0600  
+
+
+FORMATS-
+
+
+     %a-     name of day                    //sun//mon//tue.....
+     %b-     name of moonth                 //jan//feb//mar.....
+     %x-     date in dd/mm/yy format        //20/11/19
+     %X-     time in hh:mm:ss format        //10:05:49
+
+     and  many more....
+
+
+
+
+
+some rust features-
+
+
+immutability
+format string vulnerability
+error messages
+unsafe function
+                     
