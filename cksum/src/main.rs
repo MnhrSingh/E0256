@@ -9,15 +9,24 @@ use std::fs::File;
 extern crate clap;
 use clap::{Arg,App};
 
+//Bit(x) sets the xth bit
 fn Bit(x: i32)-> u32{
 	1u32<<x
 }
+
 fn SBit()-> u32{
 	Bit(31)
 }
+
 fn Generate_polynomial()->u32{
-	Bit(26)|Bit(23)|Bit(22)|Bit(16)|Bit(12)|Bit(11)|Bit(10)|Bit(8)|Bit(7)|Bit(5)|Bit(4)|Bit(2)|Bit(1)|Bit(0)
+	let mut poly:u32=0u32;
+	poly=Bit(26)|Bit(23)|Bit(22)|Bit(16);
+	poly|=Bit(12)|Bit(11)|Bit(10)|Bit(8);
+	poly|=Bit(7)|Bit(5)|Bit(4)|Bit(2)|Bit(1);
+	poly|=Bit(0);
+	return poly;
 }
+
 fn cksum_entry(num: u8)->u32{
 	let mut cks=(num as u32)<<24;
 	for i in 0..8{
@@ -28,6 +37,7 @@ fn cksum_entry(num: u8)->u32{
 	}
 	return cks;
 }
+
 // static v:Vec<u32>=Vec::with_capacity(8);
 fn crc_rem(r: Vec<u32>,m: i32)->u32{
 	let mut rem:u32=0;
@@ -47,17 +57,25 @@ fn crc_rem(r: Vec<u32>,m: i32)->u32{
 	}
 	return (rem&(0xFFFFFFFF));
 }
+
+//compile on linux
 #[cfg(not(windows))]
 fn get_byte_arr() -> [u8; 1024 * 1024] {
     unsafe { mem::uninitialized() }
 }
+
+//compile on windows
 #[cfg(windows)]
 fn get_byte_arr() -> Vec<u8> {
     vec![0; 1024 * 1024]
 }
+
 fn crc_upd(crc_val: u32,num: u8,crc_tab: &Vec<u32>)->u32{
+	//this is the standard iso crc32 algorithm
 	(crc_val<<8)^crc_tab[((crc_val>>24) as usize ^ num as usize)& 0xFF]
 }
+
+//this is the primary function that uses calls to helpers to compute the checksum
 fn crc(mut tmp_crc: u32,mut len: usize,crc_tab: &Vec<u32>)-> u32{
 	while len!=0{
 		tmp_crc=crc_upd(tmp_crc,len as u8,crc_tab);
@@ -65,7 +83,11 @@ fn crc(mut tmp_crc: u32,mut len: usize,crc_tab: &Vec<u32>)-> u32{
 	}
 	return !tmp_crc;
 }
+
 fn main(){
+	//CRC table to improve computation speed
+	// it stores 256 precomputed crcs
+	//notice the odd-even alternation
 	let crc_tab: Vec<u32>=vec![0x00000000,
   0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b,
   0x1a864db2, 0x1e475005, 0x2608edb8, 0x22c9f00f, 0x2f8ad6d6,
@@ -119,32 +141,48 @@ fn main(){
   0x933eb0bb, 0x97ffad0c, 0xafb010b1, 0xab710d06, 0xa6322bdf,
   0xa2f33668, 0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 ];
+	
 	let mut r: Vec<u32>=vec![0;8];
+	//Generate_polynomial() computes our standard G(x)
 	r[0]=Generate_polynomial();
 	for i in 1..8{
 		r[i]=(r[i-1]<<1);
-		if((r[i-1]&SBit())>0u32){
+		let prev_r:u32=r[i-1]&SBit();
+		if((prev_r>0u32){
 			r[i]=r[i]^Generate_polynomial();
 		}
 	}
 	// unsafe{
-	// // v=1;
+	//  r=[mem::uninitialized];
 	// }
+	
+//Argument parsing using clap
 	let matches = App::new("Checksum").version("1.0").help("Calculates checksum").author("Manohar Lal - 16896").arg(Arg::with_name("file").required(true).min_values(1)).get_matches();
 	let files: Vec<_> = matches.values_of("file").unwrap().collect();
 	// let contents = fs::read_to_string(files[0]).expect("Something went wrong reading the file");
+//cksum can handle multiple file arguments, it prints checksum of each one of them on separate lines
 	for file in files.iter(){
-		
+	//crc_fin stores the checksum result
 	let mut crc_fin= 0u32;
+	//size_fin store no of bytes read from file
 	let mut size_fin=0usize;
+		
+//Error handling if file is not accessible
 		let f= File::open(file).expect("Unable to read file!");
+//BufReader does not load whole file in memory from disk.
+//SO it can read files which are GBs in size
 		let mut buf=BufReader::new(f);
 		let mut byte_arr=get_byte_arr();
 		loop{
 			match buf.read(&mut byte_arr){
+				//proceed if file is readable
 				Ok(len_bytes)=>{
+					// EOF has been encountered, print the output and parse next file if available
 					if len_bytes==0{
-						println!("{}",crc(crc_fin,size_fin,&crc_tab));
+						//print on a new line for every file
+						//1.checkum of the file, 2.no of bytes read
+						println!("The cheksum and file size are :");
+						println!("{}  {}",crc(crc_fin,size_fin,&crc_tab),size_fin);
 						break;
 					}
 					for &byt in byte_arr[..len_bytes].iter(){
@@ -152,6 +190,7 @@ fn main(){
 					}
 					size_fin=size_fin+len_bytes;
 				}
+				//report error
 				Err(err)=> {println!("Error occured");}
 			}
 		}
